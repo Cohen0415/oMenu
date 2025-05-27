@@ -1,0 +1,28 @@
+menuconfig OMENU
+    bool "oMenu"
+    default n
+    help
+      Enable the Device Tree Overlay (DTBO) plugin menu system in U-Boot.
+      When enabled, allows selection and configuration of DTBO plugins
+      such as LCD, I2C, SPI via directory-based structure.
+
+      启用 oMenu：U-Boot 中的设备树覆盖（DTBO）插件系统。
+      启用后可通过菜单选择和配置插件设备树（如 LCD、I2C、SPI 等）。
+
+if OMENU
+
+config OMENU_MMC_DEV_NUM
+    string "MMC Device"
+    default "0"
+    help
+      MMC device number where DTBO overlays are stored.
+      通常为启动 TF 卡或 eMMC 的设备号，如 mmc 0 或 mmc 1。
+
+config OMENU_MMC_PARTITION
+    string "MMC Partition"
+    default "0"
+    help
+      Partition number in MMC device where /omenu resides.
+      对应分区编号，如 1 表示 mmc 0:1。
+
+endif # OMENU
