@@ -25,4 +25,11 @@ config OMENU_MMC_PARTITION
       Partition number in MMC device where /omenu resides.
       对应分区编号，如 1 表示 mmc 0:1。
 
+config OMENU_DIRECTORY_NAME
+    string "Directory Name"
+    default "omenu"
+    help
+      This option specifies the name of the directory containing
+      device tree overlay plugins used by the OMENU system.
+
 endif # OMENU
