@@ -123,19 +123,10 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
     buf[len] = '\0';
     
     int count = 0;
-	int started = 0;
     char *line = strtok(buf, "\r\n");
     while (line && count < MAX_SELECTION) 
 	{
-		if (!strcmp(line, "[start]"))
-		{
-			started = 1;
-		}
-		else if (!strcmp(line, "[end]"))
-		{
-			break;
-		}
-		else if (started && line[0] != '#')
+		if (line[0] != '#')
 		{
 			entries[count] = strdup(line);
 			is_dir[count] = strstr(line, ".dtbo") == NULL;
