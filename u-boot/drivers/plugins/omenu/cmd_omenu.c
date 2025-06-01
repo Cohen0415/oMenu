@@ -167,7 +167,8 @@ static void show_menu(const char *base_path)
                 printf("[%d] [%c] %s\n", i + 1, is_selected(full_path) ? '*' : ' ', entries[i]);
             }
         }
-        printf("[0] %s\n", strcmp(base_path, cfg.directory_name) == 0 ? "Quit" : "Back");
+        printf("[%s] %s\n", strcmp(base_path, cfg.directory_name) == 0 ? "q" : "0", 
+                            strcmp(base_path, cfg.directory_name) == 0 ? "Quit" : "Back");
 
 		// 用户输入
         char inbuf[16] = {0};
@@ -176,20 +177,27 @@ static void show_menu(const char *base_path)
 		if (inbuf[0] == '\0')
 			continue;
 
+        // 对顶层目录菜单选项做特殊判断
+        if (strcmp(base_path, cfg.directory_name) == 0)
+        {
+            if (inbuf[0] == 'q')    // 退出菜单
+                break;
+        }
+
 		char *endptr;
 		int sel = simple_strtoul(inbuf, &endptr, 10);
 		
-		// 非负整数 输入检查
-		if (*endptr != '\0')
-			continue;
+        // 非负整数 输入检查
+        if (*endptr != '\0')
+            continue;
 
-		// 输入数值超过现有选项
-		if (sel > count)
-			continue;
+        // 输入数值超过现有选项
+        if (sel > count)
+            continue;
 
-		// 输入0，返回上级目录或退出菜单
-		if (sel == 0)
-    		break;
+        // 输入0，返回上级目录
+        if (sel == 0)
+            break;
 
         if (is_dir[sel - 1]) 
 		{
