@@ -120,7 +120,8 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
         printf("Failed to read %s\n", file_path);
         return 0;
     }
-
+    buf[len] = '\0';
+    
     int count = 0;
 	int started = 0;
     char *line = strtok(buf, "\r\n");
