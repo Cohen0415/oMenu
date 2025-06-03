@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <console.h>
 #include <cli.h>
+#include <mapmem.h>
 
 #include "cmd_omenu.h"
 
@@ -107,7 +108,7 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
 
 	char dev_part[10];
 	snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
-	if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE_ANY)) 
+	if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
 	{
         printf("Failed to set blk dev\n");
         return CMD_RET_FAILURE;
@@ -138,6 +139,89 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
     return count;
 }
 
+static void update_selections(void)
+{
+	char dev_part[10];
+	snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
+	if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
+	{
+        printf("Failed to set blk dev\n");
+        return;
+    }
+
+    loff_t len;
+    char buf[2048];
+    if (fs_read(SELECTED_FILE_NAME, (ulong)buf, 0, sizeof(buf), &len)) 
+	{
+        printf("Failed to read %s\n", SELECTED_FILE_NAME);
+        return;
+    }
+    buf[len] = '\0';
+    
+    char *line = strtok(buf, "\r\n");
+    while (line && selection_count < MAX_SELECTION) 
+	{
+		if (line[0] != '#')
+		{
+            selections[selection_count++] = strdup(line);
+		}
+        line = strtok(NULL, "\r\n");
+    }
+}
+
+static void save_selections(void)
+{
+    loff_t len;
+    int ret;
+
+    char dev_part[10];
+    snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
+    if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
+    {
+        printf("Failed to set block device\n");
+        return;
+    }
+
+    char *buf = malloc(4096);
+    if (!buf) 
+    {
+        printf("Failed to allocate buffer\n");
+        return;
+    }
+
+    buf[0] = '\0';
+    size_t offset = 0;
+    for (int i = 0; i < selection_count; i++) 
+    {
+        if (!selections[i]) 
+        {
+            printf("Warning: NULL selection at index %d\n", i);
+            continue;
+        }
+
+        int n = snprintf(buf + offset, 4096 - offset, "%s\n", selections[i]);
+        if (n < 0 || offset + n >= 4096) 
+        {
+            printf("Selection list too long!\n");
+            free(buf);
+            return;
+        }
+        offset += n;
+    }
+
+    ret = fs_write(SELECTED_FILE_NAME, (ulong)buf, 0, offset, &len);
+    free(buf);
+
+    if (ret != 0 || len != offset) 
+    {
+        printf("Failed to write %s (ret=%d, len=%llu)\n", SELECTED_FILE_NAME, ret, len);
+    } 
+    else 
+    {
+        printf("Saved %d selections to %s\n", selection_count, SELECTED_FILE_NAME);
+    }
+}
+
 static void show_menu(const char *base_path) 
 {
     char *entries[MAX_SELECTION];
@@ -159,8 +243,15 @@ static void show_menu(const char *base_path)
                 printf("[%d] [%c] %s\n", i + 1, is_selected(full_path) ? '*' : ' ', entries[i]);
             }
         }
-        printf("[%s] %s\n", strcmp(base_path, cfg.directory_name) == 0 ? "q" : "0", 
-                            strcmp(base_path, cfg.directory_name) == 0 ? "Quit" : "Back");
+        if (strcmp(base_path, cfg.directory_name) == 0)
+        {
+            printf("[s] Save\n");
+            printf("[q] Quit\n");
+        }
+        else
+        {
+            printf("[0] Back\n");
+        }
 
 		// 用户输入
         char inbuf[16] = {0};
@@ -174,6 +265,12 @@ static void show_menu(const char *base_path)
         {
             if (inbuf[0] == 'q')    // 退出菜单
                 break;
+
+            if (inbuf[0] == 's')    // 保存已选择的插件
+            {
+                save_selections();
+                continue;
+            }
         }
 
 		char *endptr;
@@ -220,8 +317,16 @@ static int do_omenu(struct cmd_tbl_s *cmdtp, int flag, int argc, char *const arg
     printf("  MMC Partition   : %s\n", cfg.mmc_partition);
     printf("  Directory Name  : %s\n", cfg.directory_name);
 
+    // 更新选择列表
+    update_selections();
+
+    // 菜单解析
 	show_menu(cfg.directory_name);
 
+    // 菜单退出，释放资源
+    for (int i = 0; i < selection_count; i++) 
+	    free(selections[i]);
+    
 	return 0;
 }
 
