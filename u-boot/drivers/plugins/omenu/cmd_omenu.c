@@ -254,6 +254,7 @@ static void show_menu(const char *base_path)
         }
         if (strcmp(base_path, cfg.directory_name) == 0)
         {
+            printf("[c] Clear\n");
             printf("[s] Save\n");
             printf("[q] Quit\n");
         }
@@ -277,6 +278,13 @@ static void show_menu(const char *base_path)
 
             if (inbuf[0] == 's')    // 保存已选择的插件
             {
+                save_selections();
+                continue;
+            }
+
+            if (inbuf[0] == 'c')    // 重置选择
+            {
+                clear_selections();
                 save_selections();
                 continue;
             }
