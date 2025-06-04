@@ -222,6 +222,15 @@ static void save_selections(void)
     }
 }
 
+static void clear_selections(void)
+{
+    for (int i = 0; i < selection_count; i++) 
+    {   
+        free(selections[i]);
+    }
+    selection_count = 0;
+}
+
 static void show_menu(const char *base_path) 
 {
     char *entries[MAX_SELECTION];
@@ -323,9 +332,8 @@ static int do_omenu(struct cmd_tbl_s *cmdtp, int flag, int argc, char *const arg
     // 菜单解析
 	show_menu(cfg.directory_name);
 
-    // 菜单退出，释放资源
-    for (int i = 0; i < selection_count; i++) 
-	    free(selections[i]);
+    // 重置选择列表
+    clear_selections();
     
 	return 0;
 }
