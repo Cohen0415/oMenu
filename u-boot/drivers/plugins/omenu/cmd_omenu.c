@@ -440,6 +440,7 @@ static void show_menu(const char *base_path)
         {
             printf("[c] clear selections and uncheck all plugins\n");
             printf("[s] save current selections to %s\n", OMENU_SELECTED_FILE_NAME);
+            printf("[r] restart the system without saving changes\n");
             printf("[q] quit the menu without saving changes\n");
         }
         else
@@ -470,6 +471,12 @@ static void show_menu(const char *base_path)
             {
                 clear_selections();
                 OMENU_LOG(OMENU_LOG_INFO, "Selections cleared\n");
+                continue;
+            }
+
+            if (inbuf[0] == 'r')    // 重启系统
+            {
+                run_command("reboot", 0);
                 continue;
             }
         }
