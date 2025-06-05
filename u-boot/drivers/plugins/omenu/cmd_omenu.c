@@ -168,12 +168,28 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
 }
 
 /*******************************
+ * @brief  : 清空当前选中的插件列表
+ * @param  : 无
+ * @return : 无
+ *******************************/
+static void clear_selections(void)
+{
+    for (int i = 0; i < selection_count; i++) 
+    {   
+        free(selections[i]);
+    }
+    selection_count = 0;
+}
+
+/*******************************
  * @brief  : 从已保存文件中加载已选中插件列表
  * @param  : 无
  * @return : 无
  *******************************/
 static void update_selections(void)
 {
+    clear_selections();
+
 	char dev_part[10];
 	snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
 	if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
@@ -258,20 +274,6 @@ static void save_selections(void)
     {
         printf("Saved %d selections to %s\n", selection_count, SELECTED_FILE_NAME);
     }
-}
-
-/*******************************
- * @brief  : 清空当前选中的插件列表
- * @param  : 无
- * @return : 无
- *******************************/
-static void clear_selections(void)
-{
-    for (int i = 0; i < selection_count; i++) 
-    {   
-        free(selections[i]);
-    }
-    selection_count = 0;
 }
 
 /*******************************
@@ -392,9 +394,6 @@ static int do_omenu(struct cmd_tbl_s *cmdtp, int flag, int argc, char *const arg
 
     // 菜单解析
 	show_menu(cfg.directory_name);
-
-    // 重置选择列表
-    clear_selections();
     
 	return 0;
 }
