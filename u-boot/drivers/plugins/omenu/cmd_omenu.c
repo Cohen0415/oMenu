@@ -134,36 +134,67 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
     char file_path[MAX_PATH];
     snprintf(file_path, sizeof(file_path), "%s/list.txt", base_path);
 
-	char dev_part[10];
-	snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
-	if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
-	{
+    char dev_part[10];
+    snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
+    if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
+    {
+        printf("Failed to set blk dev\n");
+        return CMD_RET_FAILURE;
+    }
+
+    loff_t file_size;
+    if (fs_size(file_path, &file_size)) 
+    {
+        printf("Failed to get size of %s\n", file_path);
+        return 0;
+    }
+
+    if (file_size == 0)
+        return 0;
+
+    if (file_size > 8192) 
+    {
+        printf("Invalid file size: %lld\n", file_size);
+        return CMD_RET_FAILURE;
+    }
+
+    char *buf = memalign(4, file_size + 1);
+    if (!buf) 
+    {
+        printf("Failed to allocate buffer\n");
+        return 0;
+    }
+
+    if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
+    {
         printf("Failed to set blk dev\n");
         return CMD_RET_FAILURE;
     }
 
     loff_t len;
-    char buf[2048];
-    if (fs_read(file_path, (ulong)buf, 0, sizeof(buf), &len)) 
-	{
+    if (fs_read(file_path, (ulong)buf, 0, file_size, &len)) 
+    {
         printf("Failed to read %s\n", file_path);
+        free(buf);
         return 0;
     }
-    buf[len] = '\0';
-    
+
+    buf[len] = '\0';  // null-terminate
+
     int count = 0;
     char *line = strtok(buf, "\r\n");
     while (line && count < MAX_SELECTION) 
-	{
-		if (line[0] != '#')
-		{
-			entries[count] = strdup(line);
-			is_dir[count] = strstr(line, ".dtbo") == NULL;
-			count++;
-		}
+    {
+        if (line[0] != '#')
+        {
+            entries[count] = strdup(line);
+            is_dir[count] = strstr(line, ".dtbo") == NULL;
+            count++;
+        }
         line = strtok(NULL, "\r\n");
     }
-	
+
+    free(buf);
     return count;
 }
 
@@ -190,32 +221,64 @@ static void update_selections(void)
 {
     clear_selections();
 
-	char dev_part[10];
-	snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
-	if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
-	{
+    char dev_part[10];
+    snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
+    if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
+    {
+        printf("Failed to set blk dev\n");
+        return;
+    }
+
+    loff_t file_size;
+    if (fs_size(SELECTED_FILE_NAME, &file_size)) 
+    {
+        printf("Failed to get size of %s\n", SELECTED_FILE_NAME);
+        return;
+    }
+
+    if (file_size == 0)
+        return;
+
+    if (file_size > 8192) 
+    {
+        printf("Invalid file size: %lld\n", file_size);
+        return;
+    }
+
+    char *buf = memalign(4, file_size + 1);  // +1 for '\0'
+    if (!buf) 
+    {
+        printf("Failed to allocate buffer\n");
+        return;
+    }
+
+    if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
+    {
         printf("Failed to set blk dev\n");
         return;
     }
 
     loff_t len;
-    char buf[2048];
-    if (fs_read(SELECTED_FILE_NAME, (ulong)buf, 0, sizeof(buf), &len)) 
-	{
+    if (fs_read(SELECTED_FILE_NAME, (ulong)buf, 0, file_size, &len)) 
+    {
         printf("Failed to read %s\n", SELECTED_FILE_NAME);
+        free(buf);
         return;
     }
-    buf[len] = '\0';
-    
+
+    buf[len] = '\0';  // null-terminate for strtok
+
     char *line = strtok(buf, "\r\n");
     while (line && selection_count < MAX_SELECTION) 
-	{
-		if (line[0] != '#')
-		{
+    {
+        if (line[0] != '#')
+        {
             selections[selection_count++] = strdup(line);
-		}
+        }
         line = strtok(NULL, "\r\n");
     }
+
+    free(buf);
 }
 
 /*******************************
@@ -236,7 +299,7 @@ static void save_selections(void)
         return;
     }
 
-    char *buf = malloc(4096);
+    char *buf = memalign(4, 4096);
     if (!buf) 
     {
         printf("Failed to allocate buffer\n");
