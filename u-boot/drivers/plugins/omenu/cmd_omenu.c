@@ -11,7 +11,7 @@
 #include "log_omenu.h"
 
 // 保存选中状态
-static char *selections[MAX_SELECTION];
+static char *selections[OMENU_MAX_SELECTION];
 static int selection_count = 0;
 
 static configs_t cfg;
@@ -132,12 +132,12 @@ static void toggle_selection(const char *path)
  *******************************/
 static int parse_list_file(const char *base_path, char *entries[], int is_dir[]) 
 {
-    char file_path[MAX_PATH];
+    char file_path[OMENU_MAX_PATH];
     snprintf(file_path, sizeof(file_path), "%s/list.txt", base_path);
 
     char dev_part[10];
     snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
-    if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
+    if (fs_set_blk_dev(OMENU_STORE_DEV, dev_part, OMENU_FS_TYPE)) 
     {
         OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
         return CMD_RET_FAILURE;
@@ -166,7 +166,7 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
         return 0;
     }
 
-    if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
+    if (fs_set_blk_dev(OMENU_STORE_DEV, dev_part, OMENU_FS_TYPE)) 
     {
         OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
         return CMD_RET_FAILURE;
@@ -184,7 +184,7 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
 
     int count = 0;
     char *line = strtok(buf, "\r\n");
-    while (line && count < MAX_SELECTION) 
+    while (line && count < OMENU_MAX_SELECTION) 
     {
         if (line[0] != '#')
         {
@@ -224,16 +224,16 @@ static void update_selections(void)
 
     char dev_part[10];
     snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
-    if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
+    if (fs_set_blk_dev(OMENU_STORE_DEV, dev_part, OMENU_FS_TYPE)) 
     {
         OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
         return;
     }
 
     loff_t file_size;
-    if (fs_size(SELECTED_FILE_NAME, &file_size)) 
+    if (fs_size(OMENU_SELECTED_FILE_NAME, &file_size)) 
     {
-        OMENU_LOG(OMENU_LOG_ERROR, "Failed to get size of %s\n", SELECTED_FILE_NAME);
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to get size of %s\n", OMENU_SELECTED_FILE_NAME);
         return;
     }
 
@@ -253,16 +253,16 @@ static void update_selections(void)
         return;
     }
 
-    if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
+    if (fs_set_blk_dev(OMENU_STORE_DEV, dev_part, OMENU_FS_TYPE)) 
     {
         OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
         return;
     }
 
     loff_t len;
-    if (fs_read(SELECTED_FILE_NAME, (ulong)buf, 0, file_size, &len)) 
+    if (fs_read(OMENU_SELECTED_FILE_NAME, (ulong)buf, 0, file_size, &len)) 
     {
-        OMENU_LOG(OMENU_LOG_ERROR, "Failed to read %s\n", SELECTED_FILE_NAME);
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to read %s\n", OMENU_SELECTED_FILE_NAME);
         free(buf);
         return;
     }
@@ -270,7 +270,7 @@ static void update_selections(void)
     buf[len] = '\0';  // null-terminate for strtok
 
     char *line = strtok(buf, "\r\n");
-    while (line && selection_count < MAX_SELECTION) 
+    while (line && selection_count < OMENU_MAX_SELECTION) 
     {
         if (line[0] != '#')
         {
@@ -294,7 +294,7 @@ static void save_selections(void)
 
     char dev_part[10];
     snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
-    if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
+    if (fs_set_blk_dev(OMENU_STORE_DEV, dev_part, OMENU_FS_TYPE)) 
     {
         OMENU_LOG(OMENU_LOG_ERROR, "Failed to set block device\n");
         return;
@@ -326,16 +326,16 @@ static void save_selections(void)
         offset += n;
     }
 
-    ret = fs_write(SELECTED_FILE_NAME, (ulong)buf, 0, offset, &len);
+    ret = fs_write(OMENU_SELECTED_FILE_NAME, (ulong)buf, 0, offset, &len);
     free(buf);
 
     if (ret != 0 || len != offset) 
     {
-        OMENU_LOG(OMENU_LOG_INFO, "Failed to write %s (ret=%d, len=%llu)\n", SELECTED_FILE_NAME, ret, len);
+        OMENU_LOG(OMENU_LOG_INFO, "Failed to write %s (ret=%d, len=%llu)\n", OMENU_SELECTED_FILE_NAME, ret, len);
     } 
     else 
     {
-        OMENU_LOG(OMENU_LOG_INFO, "Saved %d selections to %s\n", selection_count, SELECTED_FILE_NAME);
+        OMENU_LOG(OMENU_LOG_INFO, "Saved %d selections to %s\n", selection_count, OMENU_SELECTED_FILE_NAME);
     }
 }
 
@@ -346,7 +346,7 @@ void omenu_fdt_apply(void)
 
     char dev_part[10];
 	snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
-	if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
+	if (fs_set_blk_dev(OMENU_STORE_DEV, dev_part, OMENU_FS_TYPE)) 
 	{
         OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
         return;
@@ -403,8 +403,8 @@ void omenu_fdt_apply(void)
  *******************************/
 static void show_menu(const char *base_path) 
 {
-    char *entries[MAX_SELECTION];
-    int is_dir[MAX_SELECTION];
+    char *entries[OMENU_MAX_SELECTION];
+    int is_dir[OMENU_MAX_SELECTION];
     int count = parse_list_file(base_path, entries, is_dir);
 
     while (1) 
@@ -417,7 +417,7 @@ static void show_menu(const char *base_path)
                 printf("[%d] %s\n", i + 1, entries[i]);
             else 
 			{
-                char full_path[MAX_PATH];
+                char full_path[OMENU_MAX_PATH];
                 snprintf(full_path, sizeof(full_path), "%s/%s", base_path, entries[i]);
                 printf("[%d] [%c] %s\n", i + 1, is_selected(full_path) ? '*' : ' ', entries[i]);
             }
@@ -477,13 +477,13 @@ static void show_menu(const char *base_path)
 
         if (is_dir[sel - 1]) 
 		{
-            char new_path[MAX_PATH];
+            char new_path[OMENU_MAX_PATH];
             snprintf(new_path, sizeof(new_path), "%s/%s", base_path, entries[sel - 1]);
             show_menu(new_path);
         } 
 		else 
 		{
-            char full_path[MAX_PATH];
+            char full_path[OMENU_MAX_PATH];
             snprintf(full_path, sizeof(full_path), "%s/%s", base_path, entries[sel - 1]);
             toggle_selection(full_path);
         }
