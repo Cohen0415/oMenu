@@ -1,6 +1,7 @@
 menuconfig OMENU
     bool "oMenu"
     default n
+    select OMENU_LOG_ENABLE
     help
       Enable the oMenu Device Tree Overlay (DTBO) plugin system in U-Boot.
       When enabled, allows selection and configuration of DTBO plugins
@@ -32,17 +33,15 @@ config OMENU_DIRECTORY_NAME
       Name of the directory containing DTBO plugins for oMenu.
       插件设备树所在目录名。
 
-menuconfig OMENU_LOG_ENABLE
-    bool "Enable oMenu logging"
+config OMENU_LOG_ENABLE
+    bool
     default y
-    help
-      Enable logging output from oMenu components.
-      启用 oMenu 日志输出功能。
 
 if OMENU_LOG_ENABLE
 
 config OMENU_LOG_LEVEL
     int "Default log level (0:INFO, 1:WARN, 2:ERROR, 3:DEBUG)"
+    depends on OMENU_LOG_ENABLE
     range 0 3
     default 0
     help
