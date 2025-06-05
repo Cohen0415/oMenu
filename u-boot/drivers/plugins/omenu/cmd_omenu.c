@@ -348,6 +348,11 @@ static void save_selections(void)
     }
 }
 
+/*******************************
+ * @brief  : 应用已选中的设备树覆盖（dtbo）文件
+ * @param  : 无
+ * @return : 无
+ *******************************/
 void omenu_fdt_apply(void)
 {
     get_omenu_config(&cfg);
@@ -433,13 +438,13 @@ static void show_menu(const char *base_path)
         }
         if (strcmp(base_path, cfg.directory_name) == 0)
         {
-            printf("[c] Clear\n");
-            printf("[s] Save\n");
-            printf("[q] Quit\n");
+            printf("[c] clear selections and uncheck all plugins\n");
+            printf("[s] save current selections to %s\n", OMENU_SELECTED_FILE_NAME);
+            printf("[q] quit the menu without saving changes\n");
         }
         else
         {
-            printf("[0] Back\n");
+            printf("[0] return to previous menu\n");
         }
 
 		// 用户输入
@@ -529,6 +534,6 @@ static int do_omenu(struct cmd_tbl_s *cmdtp, int flag, int argc, char *const arg
 
 U_BOOT_CMD(
 	omenu, 1, 0, do_omenu,
-	"dtbo menu",
-	"dtbo menu"
+	"oMenu - interactive device tree overlay selection menu",
+	"oMenu - interactive device tree overlay selection menu"
 );
