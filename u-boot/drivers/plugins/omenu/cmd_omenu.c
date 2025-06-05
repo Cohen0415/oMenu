@@ -335,7 +335,6 @@ static void show_menu(const char *base_path)
             if (inbuf[0] == 'c')    // 重置选择
             {
                 clear_selections();
-                save_selections();
                 continue;
             }
         }
