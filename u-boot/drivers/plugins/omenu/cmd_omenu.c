@@ -8,6 +8,7 @@
 #include <mapmem.h>
 
 #include "cmd_omenu.h"
+#include "log_omenu.h"
 
 // 保存选中状态
 static char *selections[MAX_SELECTION];
@@ -70,19 +71,19 @@ static void get_omenu_config(configs_t *cfg)
 #ifdef CONFIG_OMENU_MMC_DEV_NUM
     strncpy(cfg->mmc_dev_num, CONFIG_OMENU_MMC_DEV_NUM, MAX_CFG_LEN - 1);
 #else
-    printf("Warning: CONFIG_OMENU_MMC_DEV_NUM not defined\n");
+    OMENU_LOG(OMENU_LOG_ERROR, "CONFIG_OMENU_MMC_DEV_NUM not defined\n");
 #endif
 
 #ifdef CONFIG_OMENU_MMC_PARTITION
     strncpy(cfg->mmc_partition, CONFIG_OMENU_MMC_PARTITION, MAX_CFG_LEN - 1);
 #else
-    printf("Warning: CONFIG_OMENU_MMC_PARTITION not defined\n");
+    OMENU_LOG(OMENU_LOG_ERROR, "CONFIG_OMENU_MMC_PARTITION not defined\n");
 #endif
 
 #ifdef CONFIG_OMENU_DIRECTORY_NAME
     strncpy(cfg->directory_name, CONFIG_OMENU_DIRECTORY_NAME, MAX_CFG_LEN - 1);
 #else
-    printf("Warning: CONFIG_OMENU_DIRECTORY_NAME not defined\n");
+    OMENU_LOG(OMENU_LOG_ERROR, "CONFIG_OMENU_DIRECTORY_NAME not defined\n");
 #endif
 }
 
@@ -138,14 +139,14 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
     snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
     if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
     {
-        printf("Failed to set blk dev\n");
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
         return CMD_RET_FAILURE;
     }
 
     loff_t file_size;
     if (fs_size(file_path, &file_size)) 
     {
-        printf("Failed to get size of %s\n", file_path);
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to get size of %s\n", file_path);
         return 0;
     }
 
@@ -154,27 +155,27 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
 
     if (file_size > 8192) 
     {
-        printf("Invalid file size: %lld\n", file_size);
+        OMENU_LOG(OMENU_LOG_ERROR, "Invalid file size: %lld\n", file_size);
         return CMD_RET_FAILURE;
     }
 
     char *buf = memalign(4, file_size + 1);
     if (!buf) 
     {
-        printf("Failed to allocate buffer\n");
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to allocate buffer\n");
         return 0;
     }
 
     if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
     {
-        printf("Failed to set blk dev\n");
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
         return CMD_RET_FAILURE;
     }
 
     loff_t len;
     if (fs_read(file_path, (ulong)buf, 0, file_size, &len)) 
     {
-        printf("Failed to read %s\n", file_path);
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to read %s\n", file_path);
         free(buf);
         return 0;
     }
@@ -225,14 +226,14 @@ static void update_selections(void)
     snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
     if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
     {
-        printf("Failed to set blk dev\n");
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
         return;
     }
 
     loff_t file_size;
     if (fs_size(SELECTED_FILE_NAME, &file_size)) 
     {
-        printf("Failed to get size of %s\n", SELECTED_FILE_NAME);
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to get size of %s\n", SELECTED_FILE_NAME);
         return;
     }
 
@@ -241,27 +242,27 @@ static void update_selections(void)
 
     if (file_size > 8192) 
     {
-        printf("Invalid file size: %lld\n", file_size);
+        OMENU_LOG(OMENU_LOG_ERROR, "Invalid file size: %lld\n", file_size);
         return;
     }
 
     char *buf = memalign(4, file_size + 1);  // +1 for '\0'
     if (!buf) 
     {
-        printf("Failed to allocate buffer\n");
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to allocate buffer\n");
         return;
     }
 
     if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
     {
-        printf("Failed to set blk dev\n");
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
         return;
     }
 
     loff_t len;
     if (fs_read(SELECTED_FILE_NAME, (ulong)buf, 0, file_size, &len)) 
     {
-        printf("Failed to read %s\n", SELECTED_FILE_NAME);
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to read %s\n", SELECTED_FILE_NAME);
         free(buf);
         return;
     }
@@ -295,14 +296,14 @@ static void save_selections(void)
     snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
     if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
     {
-        printf("Failed to set block device\n");
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to set block device\n");
         return;
     }
 
     char *buf = memalign(4, 4096);
     if (!buf) 
     {
-        printf("Failed to allocate buffer\n");
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to allocate buffer\n");
         return;
     }
 
@@ -312,14 +313,13 @@ static void save_selections(void)
     {
         if (!selections[i]) 
         {
-            printf("Warning: NULL selection at index %d\n", i);
             continue;
         }
 
         int n = snprintf(buf + offset, 4096 - offset, "%s\n", selections[i]);
         if (n < 0 || offset + n >= 4096) 
         {
-            printf("Selection list too long!\n");
+            OMENU_LOG(OMENU_LOG_ERROR, "Selection list too long!\n");
             free(buf);
             return;
         }
@@ -331,11 +331,11 @@ static void save_selections(void)
 
     if (ret != 0 || len != offset) 
     {
-        printf("Failed to write %s (ret=%d, len=%llu)\n", SELECTED_FILE_NAME, ret, len);
+        OMENU_LOG(OMENU_LOG_INFO, "Failed to write %s (ret=%d, len=%llu)\n", SELECTED_FILE_NAME, ret, len);
     } 
     else 
     {
-        printf("Saved %d selections to %s\n", selection_count, SELECTED_FILE_NAME);
+        OMENU_LOG(OMENU_LOG_INFO, "Saved %d selections to %s\n", selection_count, SELECTED_FILE_NAME);
     }
 }
 
@@ -348,7 +348,7 @@ void omenu_fdt_apply(void)
 	snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
 	if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
 	{
-        printf("Failed to set blk dev\n");
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
         return;
     }
 
@@ -356,26 +356,26 @@ void omenu_fdt_apply(void)
     {
         const char *dtbo_path = selections[i];
 
-        printf("Applying overlay: %s\n", dtbo_path);
+        OMENU_LOG(OMENU_LOG_INFO, "Applying overlay: %s\n", dtbo_path);
 
         loff_t len;
         void *dtbo_buf = malloc(0x20000);  // 分配 128KB 缓冲区
         if (!dtbo_buf) 
         {
-            printf("Failed to allocate memory for overlay\n");
+            OMENU_LOG(OMENU_LOG_ERROR, "Failed to allocate memory for overlay\n");
             return;
         }
 
         if (fs_read(dtbo_path, (ulong)dtbo_buf, 0, 0x20000, &len)) 
         {
-            printf("Failed to read dtbo file: %s\n", dtbo_path);
+            OMENU_LOG(OMENU_LOG_ERROR, "Failed to read dtbo file: %s\n", dtbo_path);
             free(dtbo_buf);
             continue;
         }
 
         if (fdt_check_header(dtbo_buf) != 0) 
         {
-            printf("Invalid FDT overlay file: %s\n", dtbo_path);
+            OMENU_LOG(OMENU_LOG_ERROR, "Invalid FDT overlay file: %s\n", dtbo_path);
             free(dtbo_buf);
             continue;
         }
@@ -385,11 +385,11 @@ void omenu_fdt_apply(void)
         int ret = fdt_overlay_apply_verbose(working_fdt, dtbo_buf);
         if (ret < 0) 
         {
-            printf("Overlay apply failed for %s\n", dtbo_path);
+            OMENU_LOG(OMENU_LOG_INFO, "Overlay apply failed for %s\n", dtbo_path);
         } 
         else 
         {
-            printf("Overlay applied: %s\n", dtbo_path);
+            OMENU_LOG(OMENU_LOG_INFO, "Overlay applied: %s\n", dtbo_path);
         }
 
         free(dtbo_buf);
@@ -455,6 +455,7 @@ static void show_menu(const char *base_path)
             if (inbuf[0] == 'c')    // 重置选择
             {
                 clear_selections();
+                OMENU_LOG(OMENU_LOG_INFO, "Selections cleared\n");
                 continue;
             }
         }
@@ -503,10 +504,10 @@ static int do_omenu(struct cmd_tbl_s *cmdtp, int flag, int argc, char *const arg
 {  
     // 获取配置
     get_omenu_config(&cfg);
-    printf("OMENU Configurations:\n");
-    printf("  MMC Device      : %s\n", cfg.mmc_dev_num);
-    printf("  MMC Partition   : %s\n", cfg.mmc_partition);
-    printf("  Directory Name  : %s\n", cfg.directory_name);
+    OMENU_LOG(OMENU_LOG_DEBUG, "OMENU Configurations:\n");
+    OMENU_LOG(OMENU_LOG_DEBUG, "MMC Device      : %s\n", cfg.mmc_dev_num);
+    OMENU_LOG(OMENU_LOG_DEBUG, "MMC Partition   : %s\n", cfg.mmc_partition);
+    OMENU_LOG(OMENU_LOG_DEBUG, "Directory Name  : %s\n", cfg.directory_name);
 
     // 更新选择列表
     update_selections();
