@@ -276,6 +276,63 @@ static void save_selections(void)
     }
 }
 
+void omenu_fdt_apply(void)
+{
+    get_omenu_config(&cfg);
+    update_selections();
+
+    char dev_part[10];
+	snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
+	if (fs_set_blk_dev(STORE_DEV, dev_part, FS_TYPE)) 
+	{
+        printf("Failed to set blk dev\n");
+        return;
+    }
+
+    for (int i = 0; i < selection_count; i++) 
+    {
+        const char *dtbo_path = selections[i];
+
+        printf("Applying overlay: %s\n", dtbo_path);
+
+        loff_t len;
+        void *dtbo_buf = malloc(0x20000);  // 分配 128KB 缓冲区
+        if (!dtbo_buf) 
+        {
+            printf("Failed to allocate memory for overlay\n");
+            return;
+        }
+
+        if (fs_read(dtbo_path, (ulong)dtbo_buf, 0, 0x20000, &len)) 
+        {
+            printf("Failed to read dtbo file: %s\n", dtbo_path);
+            free(dtbo_buf);
+            continue;
+        }
+
+        if (fdt_check_header(dtbo_buf) != 0) 
+        {
+            printf("Invalid FDT overlay file: %s\n", dtbo_path);
+            free(dtbo_buf);
+            continue;
+        }
+
+        run_command("fdt resize 8192", 0);
+
+        int ret = fdt_overlay_apply_verbose(working_fdt, dtbo_buf);
+        if (ret < 0) 
+        {
+            printf("Overlay apply failed for %s\n", dtbo_path);
+        } 
+        else 
+        {
+            printf("Overlay applied: %s\n", dtbo_path);
+        }
+
+        free(dtbo_buf);
+    }
+}
+
 /*******************************
  * @brief  : 展示交互式插件菜单界面，支持递归进入子目录
  * @param  : base_path - 当前显示菜单的路径
