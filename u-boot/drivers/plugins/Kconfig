@@ -2,9 +2,9 @@ menuconfig OMENU
     bool "oMenu"
     default n
     help
-      Enable the Device Tree Overlay (DTBO) plugin menu system in U-Boot.
+      Enable the oMenu Device Tree Overlay (DTBO) plugin system in U-Boot.
       When enabled, allows selection and configuration of DTBO plugins
-      such as LCD, I2C, SPI via directory-based structure.
+      such as LCD, I2C, SPI via a directory-based structure.
 
       启用 oMenu：U-Boot 中的设备树覆盖（DTBO）插件系统。
       启用后可通过菜单选择和配置插件设备树（如 LCD、I2C、SPI 等）。
@@ -22,14 +22,34 @@ config OMENU_MMC_PARTITION
     string "MMC Partition"
     default "0"
     help
-      Partition number in MMC device where /omenu resides.
+      Partition number in the MMC device where /omenu resides.
       对应分区编号，如 1 表示 mmc 0:1。
 
 config OMENU_DIRECTORY_NAME
     string "Directory Name"
     default "omenu"
     help
-      This option specifies the name of the directory containing
-      device tree overlay plugins used by the OMENU system.
+      Name of the directory containing DTBO plugins for oMenu.
+      插件设备树所在目录名。
+
+menuconfig OMENU_LOG_ENABLE
+    bool "Enable oMenu logging"
+    default y
+    help
+      Enable logging output from oMenu components.
+      启用 oMenu 日志输出功能。
+
+if OMENU_LOG_ENABLE
+
+config OMENU_LOG_LEVEL
+    int "Default log level (0:INFO, 1:WARN, 2:ERROR, 3:DEBUG)"
+    range 0 3
+    default 0
+    help
+      Select the minimum log level oMenu will output.
+      仅打印级别小于等于该值的日志（0=仅 INFO，3=全部）。
+
+endif # OMENU_LOG_ENABLE
 
 endif # OMENU
+
