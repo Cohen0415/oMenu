@@ -15,6 +15,12 @@ static int selection_count = 0;
 
 static configs_t cfg;
 
+/*******************************
+ * @brief  : 从控制台读取一行输入，支持退格处理
+ * @param  : buf - 存储输入内容的缓冲区
+ * @param  : maxlen - 缓冲区最大长度
+ * @return : 无
+ *******************************/
 static void read_line(char *buf, int maxlen)
 {
     int i = 0;
@@ -49,6 +55,11 @@ static void read_line(char *buf, int maxlen)
     buf[i] = '\0';
 }
 
+/*******************************
+ * @brief  : 获取 oMenu 配置参数
+ * @param  : cfg - 配置结构体指针
+ * @return : 无
+ *******************************/
 static void get_omenu_config(configs_t *cfg)
 {
 	if (!cfg) 
@@ -75,6 +86,11 @@ static void get_omenu_config(configs_t *cfg)
 #endif
 }
 
+/*******************************
+ * @brief  : 判断路径是否已选中
+ * @param  : path - 路径字符串
+ * @return : 1 表示已选中，0 表示未选中
+ *******************************/
 static int is_selected(const char *path) 
 {
     for (int i = 0; i < selection_count; i++) 
@@ -85,6 +101,11 @@ static int is_selected(const char *path)
     return 0;
 }
 
+/*******************************
+ * @brief  : 切换选中状态（选中或取消）
+ * @param  : path - 路径字符串
+ * @return : 无
+ *******************************/
 static void toggle_selection(const char *path) 
 {
     for (int i = 0; i < selection_count; i++) 
@@ -101,6 +122,13 @@ static void toggle_selection(const char *path)
     selections[selection_count++] = strdup(path);
 }
 
+/*******************************
+ * @brief  : 解析 list.txt 文件，提取条目并标记目录或文件
+ * @param  : base_path - 当前菜单路径
+ * @param  : entries - 存储条目名称数组
+ * @param  : is_dir - 标记每个条目是否为目录的数组
+ * @return : 返回有效条目数量
+ *******************************/
 static int parse_list_file(const char *base_path, char *entries[], int is_dir[]) 
 {
     char file_path[MAX_PATH];
@@ -139,6 +167,11 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
     return count;
 }
 
+/*******************************
+ * @brief  : 从已保存文件中加载已选中插件列表
+ * @param  : 无
+ * @return : 无
+ *******************************/
 static void update_selections(void)
 {
 	char dev_part[10];
@@ -169,6 +202,11 @@ static void update_selections(void)
     }
 }
 
+/*******************************
+ * @brief  : 将当前选中的插件路径写入保存文件
+ * @param  : 无
+ * @return : 无
+ *******************************/
 static void save_selections(void)
 {
     loff_t len;
@@ -222,6 +260,11 @@ static void save_selections(void)
     }
 }
 
+/*******************************
+ * @brief  : 清空当前选中的插件列表
+ * @param  : 无
+ * @return : 无
+ *******************************/
 static void clear_selections(void)
 {
     for (int i = 0; i < selection_count; i++) 
@@ -231,6 +274,11 @@ static void clear_selections(void)
     selection_count = 0;
 }
 
+/*******************************
+ * @brief  : 展示交互式插件菜单界面，支持递归进入子目录
+ * @param  : base_path - 当前显示菜单的路径
+ * @return : 无
+ *******************************/
 static void show_menu(const char *base_path) 
 {
     char *entries[MAX_SELECTION];
@@ -325,6 +373,11 @@ static void show_menu(const char *base_path)
     }
 }
 
+/*******************************
+ * @brief  : omenu 命令入口
+ * @param  : cmdtp, flag, argc, argv - 命令行参数
+ * @return : 0
+ *******************************/
 static int do_omenu(struct cmd_tbl_s *cmdtp, int flag, int argc, char *const argv[])
 {  
     // 获取配置
