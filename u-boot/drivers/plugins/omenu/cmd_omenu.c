@@ -64,26 +64,35 @@ static void read_line(char *buf, int maxlen)
 static void get_omenu_config(configs_t *cfg)
 {
 	if (!cfg) 
+    {
+		OMENU_LOG(OMENU_LOG_ERROR, "cfg is NULL\n");
 		return;
+	}
 
-    memset(cfg, 0, sizeof(configs_t));
+	memset(cfg, 0, sizeof(configs_t));
 
+	// MMC Device Number
 #ifdef CONFIG_OMENU_MMC_DEV_NUM
-    strncpy(cfg->mmc_dev_num, CONFIG_OMENU_MMC_DEV_NUM, MAX_CFG_LEN - 1);
+	strncpy(cfg->mmc_dev_num, CONFIG_OMENU_MMC_DEV_NUM, MAX_CFG_LEN - 1);
 #else
-    OMENU_LOG(OMENU_LOG_ERROR, "CONFIG_OMENU_MMC_DEV_NUM not defined\n");
+	OMENU_LOG(OMENU_LOG_ERROR, "CONFIG_OMENU_MMC_DEV_NUM not defined, using default 0\n");
+	strcpy(cfg->mmc_dev_num, "0");
 #endif
 
+	// MMC Partition
 #ifdef CONFIG_OMENU_MMC_PARTITION
-    strncpy(cfg->mmc_partition, CONFIG_OMENU_MMC_PARTITION, MAX_CFG_LEN - 1);
+	strncpy(cfg->mmc_partition, CONFIG_OMENU_MMC_PARTITION, MAX_CFG_LEN - 1);
 #else
-    OMENU_LOG(OMENU_LOG_ERROR, "CONFIG_OMENU_MMC_PARTITION not defined\n");
+	OMENU_LOG(OMENU_LOG_ERROR, "CONFIG_OMENU_MMC_PARTITION not defined, using default 0\n");
+	strcpy(cfg->mmc_partition, "0");
 #endif
 
+	// Directory Name
 #ifdef CONFIG_OMENU_DIRECTORY_NAME
-    strncpy(cfg->directory_name, CONFIG_OMENU_DIRECTORY_NAME, MAX_CFG_LEN - 1);
+	strncpy(cfg->directory_name, CONFIG_OMENU_DIRECTORY_NAME, MAX_CFG_LEN - 1);
 #else
-    OMENU_LOG(OMENU_LOG_ERROR, "CONFIG_OMENU_DIRECTORY_NAME not defined\n");
+	OMENU_LOG(OMENU_LOG_ERROR, "CONFIG_OMENU_DIRECTORY_NAME not defined, using default \"omenu\"\n");
+	strcpy(cfg->directory_name, "omenu");
 #endif
 }
 
