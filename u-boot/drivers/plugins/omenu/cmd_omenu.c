@@ -309,14 +309,28 @@ static void save_selections(void)
         return;
     }
 
-    char *buf = memalign(4, 4096);
+    int total_size = 0;
+    for (int i = 0; i < selection_count; i++) 
+    {
+        if (selections[i]) 
+        {
+            total_size += strlen(selections[i]) + 1; // +1 for '\n'
+        }
+    }
+
+    if (total_size > 4096) 
+    {
+        OMENU_LOG(OMENU_LOG_ERROR, "Total selection size exceeds 4096 bytes\n");
+        return;
+    }
+
+    char *buf = memalign(4, total_size);  
     if (!buf) 
     {
         OMENU_LOG(OMENU_LOG_ERROR, "Failed to allocate buffer\n");
         return;
     }
 
-    buf[0] = '\0';
     size_t offset = 0;
     for (int i = 0; i < selection_count; i++) 
     {
@@ -325,10 +339,10 @@ static void save_selections(void)
             continue;
         }
 
-        int n = snprintf(buf + offset, 4096 - offset, "%s\n", selections[i]);
-        if (n < 0 || offset + n >= 4096) 
+        int n = sprintf(buf + offset, "%s\n", selections[i]);
+        if (n <= 0 || offset + n > total_size) 
         {
-            OMENU_LOG(OMENU_LOG_ERROR, "Selection list too long!\n");
+            OMENU_LOG(OMENU_LOG_ERROR, "Selection list too long or sprintf error!\n");
             free(buf);
             return;
         }
