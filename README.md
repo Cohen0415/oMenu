@@ -338,4 +338,3 @@ Select: r
 
 本人qq：1033878279
 
-嵌入式Linux学习交流q群：<font style="color:rgb(77, 77, 77);">424571391</font>
