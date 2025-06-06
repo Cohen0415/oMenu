@@ -387,14 +387,14 @@ void omenu_fdt_apply(void)
         OMENU_LOG(OMENU_LOG_INFO, "Applying overlay: %s\n", dtbo_path);
 
         loff_t len;
-        void *dtbo_buf = malloc(0x20000);  // 分配 128KB 缓冲区
+        void *dtbo_buf = malloc(OMENU_MAX_DTBO_SIZE);  // 分配 128KB 缓冲区
         if (!dtbo_buf) 
         {
             OMENU_LOG(OMENU_LOG_ERROR, "Failed to allocate memory for overlay\n");
             return;
         }
 
-        if (fs_read(dtbo_path, (ulong)dtbo_buf, 0, 0x20000, &len)) 
+        if (fs_read(dtbo_path, (ulong)dtbo_buf, 0, OMENU_MAX_DTBO_SIZE, &len)) 
         {
             OMENU_LOG(OMENU_LOG_ERROR, "Failed to read dtbo file: %s\n", dtbo_path);
             free(dtbo_buf);
