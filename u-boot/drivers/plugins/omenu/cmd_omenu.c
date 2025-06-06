@@ -438,10 +438,10 @@ static void show_menu(const char *base_path)
         }
         if (strcmp(base_path, cfg.directory_name) == 0)
         {
-            printf("[c] clear selections and uncheck all plugins\n");
-            printf("[s] save current selections to %s\n", OMENU_SELECTED_FILE_NAME);
-            printf("[r] restart the system without saving changes\n");
-            printf("[q] quit the menu without saving changes\n");
+            printf("[c] clear:  clear selections and uncheck all plugins\n");
+            printf("[s] save:   save current selections to %s\n", OMENU_SELECTED_FILE_NAME);
+            printf("[r] reboot: restart the system without saving changes\n");
+            printf("[q] quit:   quit the menu without saving changes\n");
         }
         else
         {
