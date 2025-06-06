@@ -373,12 +373,7 @@ void omenu_fdt_apply(void)
     update_selections();
 
     char dev_part[10];
-	snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
-	if (fs_set_blk_dev(OMENU_STORE_DEV, dev_part, OMENU_FS_TYPE)) 
-	{
-        OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
-        return;
-    }
+    snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
 
     for (int i = 0; i < selection_count; i++) 
     {
@@ -387,10 +382,17 @@ void omenu_fdt_apply(void)
         OMENU_LOG(OMENU_LOG_INFO, "Applying overlay: %s\n", dtbo_path);
 
         loff_t len;
-        void *dtbo_buf = malloc(OMENU_MAX_DTBO_SIZE);  // 分配 128KB 缓冲区
+        void *dtbo_buf = memalign(4, OMENU_MAX_DTBO_SIZE);  // 分配 128KB 缓冲区
         if (!dtbo_buf) 
         {
             OMENU_LOG(OMENU_LOG_ERROR, "Failed to allocate memory for overlay\n");
+            return;
+        }
+        
+        if (fs_set_blk_dev(OMENU_STORE_DEV, dev_part, OMENU_FS_TYPE)) 
+        {
+            OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
+            free(dtbo_buf);
             return;
         }
 
