@@ -539,6 +539,7 @@ static int do_omenu(struct cmd_tbl_s *cmdtp, int flag, int argc, char *const arg
 {  
     // 获取配置
     get_omenu_config(&cfg);
+    OMENU_LOG(OMENU_LOG_DEBUG, "OMENU Version: %s\n", OMENU_VERSION);
     OMENU_LOG(OMENU_LOG_DEBUG, "OMENU Configurations:\n");
     OMENU_LOG(OMENU_LOG_DEBUG, "MMC Device      : %s\n", cfg.mmc_dev_num);
     OMENU_LOG(OMENU_LOG_DEBUG, "MMC Partition   : %s\n", cfg.mmc_partition);
