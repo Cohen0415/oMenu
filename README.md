@@ -333,7 +333,11 @@ Select: r
 
 ![](https://i-blog.csdnimg.cn/img_convert/30d0b89f2b6232c42897faf0416f398d.png)
 
-# 8、问题交流
+# 8、其它
+
+关于设备树插件dtbo的生成和应用可以参考：https://blog.csdn.net/CATTLE_L/article/details/139498061
+
+# 9、问题交流
 若在移植使用过程中遇到问题，欢迎提issues。或联系：
 
 本人qq：1033878279
