@@ -1,0 +1,2 @@
+i2c-1.dtbo
+i2c-2.dtbo

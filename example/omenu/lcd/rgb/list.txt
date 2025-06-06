@@ -1,0 +1,1 @@
+rgb-10.1inch.dtbo

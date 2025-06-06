@@ -1,0 +1,2 @@
+spi-1.dtbo
+spi-2.dtbo

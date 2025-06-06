@@ -1,0 +1,2 @@
+mipi-3.5inch.dtbo
+mipi-7inch.dtbo
