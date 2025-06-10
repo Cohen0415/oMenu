@@ -71,20 +71,23 @@ static void get_omenu_config(configs_t *cfg)
 
 	memset(cfg, 0, sizeof(configs_t));
 
-	// MMC Device Number
-#ifdef CONFIG_OMENU_MMC_DEV_NUM
-	strncpy(cfg->mmc_dev_num, CONFIG_OMENU_MMC_DEV_NUM, MAX_CFG_LEN - 1);
+    // Storage Type
+    strncpy(cfg->stroage_type, OMENU_STORAGE_DEV, MAX_CFG_LEN - 1);
+
+	// Storage Device Number
+#ifdef CONFIG_OMENU_STORAGE_DEV_NUM
+	strncpy(cfg->stroage_dev_num, CONFIG_OMENU_STORAGE_DEV_NUM, MAX_CFG_LEN - 1);
 #else
-	OMENU_LOG(OMENU_LOG_ERROR, "CONFIG_OMENU_MMC_DEV_NUM not defined, using default 0\n");
-	strcpy(cfg->mmc_dev_num, "0");
+	OMENU_LOG(OMENU_LOG_ERROR, "CONFIG_OMENU_STORAGE_DEV_NUM not defined, using default 0\n");
+	strcpy(cfg->stroage_dev_num, "0");
 #endif
 
-	// MMC Partition
-#ifdef CONFIG_OMENU_MMC_PARTITION
-	strncpy(cfg->mmc_partition, CONFIG_OMENU_MMC_PARTITION, MAX_CFG_LEN - 1);
+	// Storage Partition
+#ifdef CONFIG_OMENU_STORAGE_PART_NUM
+	strncpy(cfg->stroage_partition, CONFIG_OMENU_STORAGE_PART_NUM, MAX_CFG_LEN - 1);
 #else
-	OMENU_LOG(OMENU_LOG_ERROR, "CONFIG_OMENU_MMC_PARTITION not defined, using default 0\n");
-	strcpy(cfg->mmc_partition, "0");
+	OMENU_LOG(OMENU_LOG_ERROR, "CONFIG_OMENU_STORAGE_PART_NUM not defined, using default 0\n");
+	strcpy(cfg->stroage_partition, "0");
 #endif
 
 	// Directory Name
@@ -145,8 +148,8 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
     snprintf(file_path, sizeof(file_path), "%s/list.txt", base_path);
 
     char dev_part[10];
-    snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
-    if (fs_set_blk_dev(OMENU_STORE_DEV, dev_part, OMENU_FS_TYPE)) 
+    snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.stroage_dev_num, cfg.stroage_partition);
+    if (fs_set_blk_dev(cfg.stroage_type, dev_part, OMENU_FS_TYPE)) 
     {
         OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
         return CMD_RET_FAILURE;
@@ -175,7 +178,7 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
         return 0;
     }
 
-    if (fs_set_blk_dev(OMENU_STORE_DEV, dev_part, OMENU_FS_TYPE)) 
+    if (fs_set_blk_dev(cfg.stroage_type, dev_part, OMENU_FS_TYPE)) 
     {
         OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
         return CMD_RET_FAILURE;
@@ -232,8 +235,8 @@ static void update_selections(void)
     clear_selections();
 
     char dev_part[10];
-    snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
-    if (fs_set_blk_dev(OMENU_STORE_DEV, dev_part, OMENU_FS_TYPE)) 
+    snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.stroage_dev_num, cfg.stroage_partition);
+    if (fs_set_blk_dev(cfg.stroage_type, dev_part, OMENU_FS_TYPE)) 
     {
         OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
         return;
@@ -262,7 +265,7 @@ static void update_selections(void)
         return;
     }
 
-    if (fs_set_blk_dev(OMENU_STORE_DEV, dev_part, OMENU_FS_TYPE)) 
+    if (fs_set_blk_dev(cfg.stroage_type, dev_part, OMENU_FS_TYPE)) 
     {
         OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
         return;
@@ -302,8 +305,8 @@ static void save_selections(void)
     int ret;
 
     char dev_part[10];
-    snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
-    if (fs_set_blk_dev(OMENU_STORE_DEV, dev_part, OMENU_FS_TYPE)) 
+    snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.stroage_dev_num, cfg.stroage_partition);
+    if (fs_set_blk_dev(cfg.stroage_type, dev_part, OMENU_FS_TYPE)) 
     {
         OMENU_LOG(OMENU_LOG_ERROR, "Failed to set block device\n");
         return;
@@ -373,7 +376,7 @@ void omenu_fdt_apply(void)
     update_selections();
 
     char dev_part[10];
-    snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.mmc_dev_num, cfg.mmc_partition);
+    snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.stroage_dev_num, cfg.stroage_partition);
 
     for (int i = 0; i < selection_count; i++) 
     {
@@ -389,7 +392,7 @@ void omenu_fdt_apply(void)
             return;
         }
         
-        if (fs_set_blk_dev(OMENU_STORE_DEV, dev_part, OMENU_FS_TYPE)) 
+        if (fs_set_blk_dev(cfg.stroage_type, dev_part, OMENU_FS_TYPE)) 
         {
             OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
             free(dtbo_buf);
@@ -543,9 +546,10 @@ static int do_omenu(struct cmd_tbl_s *cmdtp, int flag, int argc, char *const arg
     get_omenu_config(&cfg);
     OMENU_LOG(OMENU_LOG_DEBUG, "OMENU Version: %s\n", OMENU_VERSION);
     OMENU_LOG(OMENU_LOG_DEBUG, "OMENU Configurations:\n");
-    OMENU_LOG(OMENU_LOG_DEBUG, "MMC Device      : %s\n", cfg.mmc_dev_num);
-    OMENU_LOG(OMENU_LOG_DEBUG, "MMC Partition   : %s\n", cfg.mmc_partition);
-    OMENU_LOG(OMENU_LOG_DEBUG, "Directory Name  : %s\n", cfg.directory_name);
+    OMENU_LOG(OMENU_LOG_DEBUG, "Storage Type        : %s\n", cfg.stroage_type);
+    OMENU_LOG(OMENU_LOG_DEBUG, "Storage Device      : %s\n", cfg.stroage_dev_num);
+    OMENU_LOG(OMENU_LOG_DEBUG, "Storage Partition   : %s\n", cfg.stroage_partition);
+    OMENU_LOG(OMENU_LOG_DEBUG, "Directory Name      : %s\n", cfg.directory_name);
 
     // 更新选择列表
     update_selections();
