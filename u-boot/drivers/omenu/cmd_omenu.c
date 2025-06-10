@@ -556,6 +556,11 @@ static int do_omenu(struct cmd_tbl_s *cmdtp, int flag, int argc, char *const arg
     OMENU_LOG(OMENU_LOG_DEBUG, "Storage Partition   : %s\n", cfg.stroage_partition);
     OMENU_LOG(OMENU_LOG_DEBUG, "Directory Name      : %s\n", cfg.directory_name);
 
+    if (strcmp(cfg.stroage_type, "usb") == 0)
+    {
+        run_command("usb start", 0);
+    }
+
     // 更新选择列表
     update_selections();
 

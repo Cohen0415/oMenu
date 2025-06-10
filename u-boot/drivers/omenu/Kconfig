@@ -23,6 +23,11 @@ config OMENU_STORAGE_MMC
     help
       Use MMC device (eMMC, SD card) as the storage for DTBO plugins.
 
+config OMENU_STORAGE_USB
+    bool "USB"
+    help
+      Use USB device as the storage for DTBO plugins.
+
 endchoice
 
 config OMENU_STORAGE_DEV_NUM
