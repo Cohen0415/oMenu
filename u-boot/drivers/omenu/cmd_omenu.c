@@ -145,14 +145,14 @@ static void toggle_selection(const char *path)
 static int parse_list_file(const char *base_path, char *entries[], int is_dir[]) 
 {
     char file_path[OMENU_MAX_PATH];
-    snprintf(file_path, sizeof(file_path), "%s/list.txt", base_path);
+    snprintf(file_path, sizeof(file_path), "%s/%s", base_path, OMENU_DIR_FILE_NAME);
 
     char dev_part[10];
     snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.stroage_dev_num, cfg.stroage_partition);
     if (fs_set_blk_dev(cfg.stroage_type, dev_part, OMENU_FS_TYPE)) 
     {
         OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
-        return CMD_RET_FAILURE;
+        return -1;
     }
 
     loff_t file_size;
@@ -168,7 +168,7 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
     if (file_size > 8192) 
     {
         OMENU_LOG(OMENU_LOG_ERROR, "Invalid file size: %lld\n", file_size);
-        return CMD_RET_FAILURE;
+        return -1;
     }
 
     char *buf = memalign(4, file_size + 1);
@@ -181,7 +181,7 @@ static int parse_list_file(const char *base_path, char *entries[], int is_dir[])
     if (fs_set_blk_dev(cfg.stroage_type, dev_part, OMENU_FS_TYPE)) 
     {
         OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
-        return CMD_RET_FAILURE;
+        return -1;
     }
 
     loff_t len;
@@ -438,7 +438,12 @@ static void show_menu(const char *base_path)
 {
     char *entries[OMENU_MAX_SELECTION];
     int is_dir[OMENU_MAX_SELECTION];
+
     int count = parse_list_file(base_path, entries, is_dir);
+    if (count < 0)
+    {
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to parse list file in %s/%s\n", base_path, OMENU_DIR_FILE_NAME);
+    }
 
     while (1) 
 	{

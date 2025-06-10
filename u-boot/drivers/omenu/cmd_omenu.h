@@ -7,6 +7,7 @@
 #define OMENU_MAX_PATH 		            256             // 菜单路径的最大长度
 #define OMENU_MAX_DTBO_SIZE             0x20000         // 设备树插件文本大小的最大限值
 
+#define OMENU_DIR_FILE_NAME            "list.txt"       // 菜单目录列表文件名
 #define OMENU_SELECTED_FILE_NAME        "selected.txt"  // 已选择的设备树插件将保存在此文件中
 #define OMENU_FS_TYPE                   FS_TYPE_FAT     // 文件系统类型，目前支持FAT
 
