@@ -214,12 +214,15 @@ camera-2.dtbo
 
 进入路径`oMenu`：
 
-![](https://i-blog.csdnimg.cn/img_convert/4038399793465ba84866713652227e8f.png)
+![](https://i-blog.csdnimg.cn/direct/eb650eb29fd549639b3f754ebacfa5d1.png)
 
-+ `MMC Device`：mmc设备号。比如你的板卡是emmc存储方案，可以在uboot命令行执行`mmc dev`命令查看设备号。同样，如果你的板卡支持sd卡，可以选择将目录放入sd卡中。
-+ `MMC Partition`：分区号。目录存储在mmc设备上的第几个分区。（目前只支持fat类型的分区格式）
++ `Storage Type`：存储介质类型。目前支持u盘和mmc。
++ `Storage Device Number`：u盘或mmc的设备号。比如你的板卡是emmc存储方案，可以在uboot命令行执行`mmc dev`命令查看设备号。若使用u盘，可执行`usb start`，再执行`usb dev`查看设备号。
++ `Storage Partition Number`：分区号。目录存储在设备上的第几个分区。（目前只支持fat32类型的分区格式）
 + `Directory Name`：目录名称。也就是上面创建的自定义目录名称。
 + `Default log level`：日志的默认等级。数字越大，等级越高。oMenu会输出小于等于默认等级的所有日志。即当默认等级设置为3时，所有日志将会输出。（在初次使用时，可以先设置成3，方便查看所有调试信息）
+
+至此，oMenu参数配置结束。
 
 至此，oMenu参数配置结束。
 
