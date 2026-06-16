@@ -23,15 +23,501 @@
 #include <console.h>
 #include <cli.h>
 #include <mapmem.h>
+#include <fdt_support.h>
+#include <linux/libfdt.h>
+#include <asm/global_data.h>
 
 #include "cmd_omenu.h"
 #include "log_omenu.h"
+
+DECLARE_GLOBAL_DATA_PTR;
 
 // 保存选中状态
 static char *selections[OMENU_MAX_SELECTION];
 static int selection_count = 0;
 
 static configs_t cfg;
+
+static int omenu_prepare_fdt(void *fdt, const char *name)
+{
+    int ret;
+
+    ret = fdt_increase_size(fdt, OMENU_FDT_PAD_SIZE);
+    if (ret && ret != -FDT_ERR_NOSPACE)
+    {
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to resize %s fdt: %s\n",
+                  name, fdt_strerror(ret));
+        return ret;
+    }
+
+    return 0;
+}
+
+static int omenu_is_string_prop(const void *prop, int len)
+{
+    if (!prop || len <= 0)
+        return 0;
+
+    return ((const char *)prop)[len - 1] == '\0';
+}
+
+static int omenu_rewrite_fixups_target_uboot(void *dtbo_buf)
+{
+    int fixups;
+    int prop_off;
+    int prop_count = 0;
+    int i;
+    int ret = 0;
+    char *prop_names[OMENU_MAX_SELECTION];
+
+    memset(prop_names, 0, sizeof(prop_names));
+
+    fixups = fdt_path_offset(dtbo_buf, OMENU_FIXUPS_NODE_PATH);
+    if (fixups < 0)
+        return 0;
+
+    prop_off = fdt_first_property_offset(dtbo_buf, fixups);
+    while (prop_off >= 0)
+    {
+        const struct fdt_property *prop;
+        const char *prop_name;
+        int len;
+
+        prop = fdt_get_property_by_offset(dtbo_buf, prop_off, &len);
+        if (!prop)
+        {
+            ret = len;
+            goto out;
+        }
+
+        if (prop_count >= OMENU_MAX_SELECTION)
+        {
+            ret = -ENOSPC;
+            goto out;
+        }
+
+        prop_name = fdt_string(dtbo_buf, fdt32_to_cpu(prop->nameoff));
+        prop_names[prop_count] = strdup(prop_name);
+        if (!prop_names[prop_count])
+        {
+            ret = -ENOMEM;
+            goto out;
+        }
+        prop_count++;
+
+        prop_off = fdt_next_property_offset(dtbo_buf, prop_off);
+    }
+
+    for (i = 0; i < prop_count; i++)
+    {
+        const struct fdt_property *prop;
+        const char *cursor;
+        char *new_buf;
+        char *dst;
+        int len;
+        int new_len = 0;
+
+        prop = fdt_get_property(dtbo_buf, fixups, prop_names[i], &len);
+        if (!prop)
+            continue;
+
+        cursor = prop->data;
+        new_buf = memalign(4, len + 1);
+        if (!new_buf)
+        {
+            ret = -ENOMEM;
+            goto out;
+        }
+
+        dst = new_buf;
+        while (cursor < ((const char *)prop->data + len))
+        {
+            const char *needle = strstr(cursor, ":" OMENU_TARGET_UBOOT_PROP ":");
+            if (needle)
+            {
+                int prefix_len = needle - cursor;
+
+                memcpy(dst, cursor, prefix_len);
+                dst += prefix_len;
+                memcpy(dst, ":" OMENU_TARGET_PROP ":", sizeof(":" OMENU_TARGET_PROP ":") - 1);
+                dst += sizeof(":" OMENU_TARGET_PROP ":") - 1;
+                strcpy(dst, needle + sizeof(":" OMENU_TARGET_UBOOT_PROP ":") - 1);
+                dst += strlen(needle + sizeof(":" OMENU_TARGET_UBOOT_PROP ":") - 1) + 1;
+            }
+            else
+            {
+                strcpy(dst, cursor);
+                dst += strlen(cursor) + 1;
+            }
+
+            cursor += strlen(cursor) + 1;
+        }
+
+        new_len = dst - new_buf;
+        ret = fdt_setprop(dtbo_buf, fixups, prop_names[i], new_buf, new_len);
+        free(new_buf);
+        if (ret)
+            goto out;
+    }
+
+out:
+    for (i = 0; i < prop_count; i++)
+        free(prop_names[i]);
+
+    return ret;
+}
+
+static int omenu_fixup_has_live_target(void *dtbo_buf, const char *fixup)
+{
+    char *work;
+    char *node_path;
+    char *prop_name;
+    char *offset;
+    int node_off;
+    int prop_len;
+    int ret = 0;
+
+    work = strdup(fixup);
+    if (!work)
+        return 0;
+
+    node_path = work;
+    if (node_path[0] != '/')
+        goto out;
+
+    prop_name = strchr(node_path + 1, ':');
+    if (!prop_name)
+        goto out;
+    *prop_name++ = '\0';
+
+    offset = strchr(prop_name, ':');
+    if (!offset)
+        goto out;
+    *offset = '\0';
+
+    node_off = fdt_path_offset(dtbo_buf, node_path);
+    if (node_off < 0)
+        goto out;
+
+    if (fdt_getprop(dtbo_buf, node_off, prop_name, &prop_len))
+        ret = 1;
+
+out:
+    free(work);
+    return ret;
+}
+
+static int omenu_prune_fixups(void *dtbo_buf)
+{
+    int fixups;
+    int prop_off;
+    int prop_count = 0;
+    int i;
+    int ret = 0;
+    char *prop_names[OMENU_MAX_SELECTION];
+
+    memset(prop_names, 0, sizeof(prop_names));
+
+    fixups = fdt_path_offset(dtbo_buf, OMENU_FIXUPS_NODE_PATH);
+    if (fixups < 0)
+        return 0;
+
+    prop_off = fdt_first_property_offset(dtbo_buf, fixups);
+    while (prop_off >= 0)
+    {
+        const struct fdt_property *prop;
+        const char *prop_name;
+        int len;
+
+        prop = fdt_get_property_by_offset(dtbo_buf, prop_off, &len);
+        if (!prop)
+        {
+            ret = len;
+            goto out;
+        }
+
+        if (prop_count >= OMENU_MAX_SELECTION)
+        {
+            ret = -ENOSPC;
+            goto out;
+        }
+
+        prop_name = fdt_string(dtbo_buf, fdt32_to_cpu(prop->nameoff));
+        prop_names[prop_count] = strdup(prop_name);
+        if (!prop_names[prop_count])
+        {
+            ret = -ENOMEM;
+            goto out;
+        }
+        prop_count++;
+
+        prop_off = fdt_next_property_offset(dtbo_buf, prop_off);
+    }
+
+    for (i = 0; i < prop_count; i++)
+    {
+        const char *cursor;
+        char *new_buf;
+        char *dst;
+        const void *prop;
+        int len;
+        int new_len = 0;
+
+        prop = fdt_getprop(dtbo_buf, fixups, prop_names[i], &len);
+        if (!prop)
+            continue;
+
+        cursor = prop;
+        new_buf = memalign(4, len + 1);
+        if (!new_buf)
+        {
+            ret = -ENOMEM;
+            goto out;
+        }
+
+        dst = new_buf;
+        while (cursor < ((const char *)prop + len))
+        {
+            if (omenu_fixup_has_live_target(dtbo_buf, cursor))
+            {
+                strcpy(dst, cursor);
+                dst += strlen(cursor) + 1;
+            }
+            cursor += strlen(cursor) + 1;
+        }
+
+        new_len = dst - new_buf;
+        if (new_len == 0)
+            ret = fdt_delprop(dtbo_buf, fixups, prop_names[i]);
+        else
+            ret = fdt_setprop(dtbo_buf, fixups, prop_names[i], new_buf, new_len);
+
+        free(new_buf);
+        if (ret)
+            goto out;
+    }
+
+out:
+    for (i = 0; i < prop_count; i++)
+        free(prop_names[i]);
+
+    return ret;
+}
+
+static int omenu_filter_kernel_overlay(void *dtbo_buf)
+{
+    int frag;
+    int frag_count = 0;
+    int ret = 0;
+    char *frag_names[OMENU_MAX_SELECTION];
+
+    memset(frag_names, 0, sizeof(frag_names));
+
+    frag = fdt_first_subnode(dtbo_buf, 0);
+    while (frag >= 0)
+    {
+        const char *frag_name;
+        if (frag_count >= OMENU_MAX_SELECTION)
+        {
+            ret = -ENOSPC;
+            goto out;
+        }
+
+        frag_name = fdt_get_name(dtbo_buf, frag, NULL);
+        if (frag_name && !strncmp(frag_name, "fragment@", 9))
+        {
+            frag_names[frag_count] = strdup(frag_name);
+            if (!frag_names[frag_count])
+            {
+                ret = -ENOMEM;
+                goto out;
+            }
+            frag_count++;
+        }
+
+        frag = fdt_next_subnode(dtbo_buf, frag);
+    }
+
+    for (frag = 0; frag < frag_count; frag++)
+    {
+        int frag_off;
+        int prop_len;
+
+        frag_off = fdt_subnode_offset(dtbo_buf, 0, frag_names[frag]);
+        if (frag_off < 0)
+            continue;
+
+        if (!fdt_getprop(dtbo_buf, frag_off, OMENU_TARGET_PROP, &prop_len) &&
+            !fdt_getprop(dtbo_buf, frag_off, OMENU_TARGET_PATH_PROP, &prop_len))
+        {
+            ret = fdt_del_node(dtbo_buf, frag_off);
+            if (ret)
+                goto out;
+            continue;
+        }
+
+        ret = fdt_delprop(dtbo_buf, frag_off, OMENU_TARGET_UBOOT_PROP);
+        if (ret && ret != -FDT_ERR_NOTFOUND)
+            goto out;
+    }
+
+    ret = omenu_prune_fixups(dtbo_buf);
+
+out:
+    while (frag_count-- > 0)
+        free(frag_names[frag_count]);
+
+    return ret;
+}
+
+static int omenu_build_uboot_overlay(const void *src_dtbo, void *dst_dtbo)
+{
+    int ret;
+    int frag;
+    int frag_count = 0;
+    int keep_count = 0;
+    char *frag_names[OMENU_MAX_SELECTION];
+
+    memset(frag_names, 0, sizeof(frag_names));
+
+    ret = fdt_open_into(src_dtbo, dst_dtbo, OMENU_MAX_DTBO_SIZE);
+    if (ret)
+        return ret;
+
+    frag = fdt_first_subnode(dst_dtbo, 0);
+    while (frag >= 0)
+    {
+        const char *frag_name;
+        if (frag_count >= OMENU_MAX_SELECTION)
+            return -ENOSPC;
+
+        frag_name = fdt_get_name(dst_dtbo, frag, NULL);
+        if (frag_name && !strncmp(frag_name, "fragment@", 9))
+            frag_names[frag_count++] = strdup(frag_name);
+
+        frag = fdt_next_subnode(dst_dtbo, frag);
+    }
+
+    for (frag = 0; frag < frag_count; frag++)
+    {
+        int frag_off;
+        const void *uboot_target;
+        void *uboot_target_copy = NULL;
+        int target_len;
+
+        frag_off = fdt_subnode_offset(dst_dtbo, 0, frag_names[frag]);
+        if (frag_off < 0)
+            continue;
+
+        uboot_target = fdt_getprop(dst_dtbo, frag_off, OMENU_TARGET_UBOOT_PROP, &target_len);
+        if (!uboot_target)
+        {
+            fdt_del_node(dst_dtbo, frag_off);
+            continue;
+        }
+
+        uboot_target_copy = memalign(4, target_len);
+        if (!uboot_target_copy)
+        {
+            ret = -ENOMEM;
+            goto out;
+        }
+
+        memcpy(uboot_target_copy, uboot_target, target_len);
+
+        fdt_delprop(dst_dtbo, frag_off, OMENU_TARGET_PROP);
+        fdt_delprop(dst_dtbo, frag_off, OMENU_TARGET_PATH_PROP);
+
+        if (omenu_is_string_prop(uboot_target_copy, target_len))
+            ret = fdt_setprop_string(dst_dtbo, frag_off, OMENU_TARGET_PATH_PROP, uboot_target_copy);
+        else
+            ret = fdt_setprop(dst_dtbo, frag_off, OMENU_TARGET_PROP, uboot_target_copy, target_len);
+
+        free(uboot_target_copy);
+        uboot_target_copy = NULL;
+
+        if (ret)
+            goto out;
+
+        fdt_delprop(dst_dtbo, frag_off, OMENU_TARGET_UBOOT_PROP);
+        keep_count++;
+    }
+
+    if (!keep_count)
+    {
+        ret = -ENOENT;
+        goto out;
+    }
+
+    ret = omenu_rewrite_fixups_target_uboot(dst_dtbo);
+    if (ret)
+        goto out;
+
+    ret = omenu_prune_fixups(dst_dtbo);
+out:
+    while (frag_count-- > 0)
+        free(frag_names[frag_count]);
+
+    return ret;
+}
+
+static int omenu_apply_uboot_overlay(const char *dtbo_path, void *dtbo_buf)
+{
+    int ret;
+    void *uboot_dtbo_buf;
+
+    uboot_dtbo_buf = memalign(4, OMENU_MAX_DTBO_SIZE);
+    if (!uboot_dtbo_buf)
+    {
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to allocate uboot overlay buffer\n");
+        return -ENOMEM;
+    }
+
+    ret = omenu_build_uboot_overlay(dtbo_buf, uboot_dtbo_buf);
+    if (ret == -ENOENT)
+    {
+        free(uboot_dtbo_buf);
+        return 0;
+    }
+
+    if (ret)
+    {
+        OMENU_LOG(OMENU_LOG_ERROR, "Failed to build uboot overlay for %s: %s\n",
+                  dtbo_path, fdt_strerror(ret));
+        free(uboot_dtbo_buf);
+        return ret;
+    }
+
+    if (!gd->fdt_blob)
+    {
+        OMENU_LOG(OMENU_LOG_ERROR, "U-Boot control fdt is NULL, skip %s\n", dtbo_path);
+        free(uboot_dtbo_buf);
+        return -EINVAL;
+    }
+
+    ret = omenu_prepare_fdt((void *)gd->fdt_blob, "uboot");
+    if (ret)
+    {
+        free(uboot_dtbo_buf);
+        return ret;
+    }
+
+    ret = fdt_overlay_apply_verbose((void *)gd->fdt_blob, uboot_dtbo_buf);
+    if (ret < 0)
+    {
+        OMENU_LOG(OMENU_LOG_ERROR, "U-Boot overlay apply failed for %s: %s\n",
+                  dtbo_path, fdt_strerror(ret));
+        free(uboot_dtbo_buf);
+        return ret;
+    }
+    else
+    {
+        OMENU_LOG(OMENU_LOG_INFO, "U-Boot overlay applied: %s\n", dtbo_path);
+    }
+
+    free(uboot_dtbo_buf);
+    return 1;
+}
 
 /*******************************
  * @brief  : 从控制台读取一行输入，支持退格处理
@@ -44,7 +530,7 @@ static void read_line(char *buf, int maxlen)
     int i = 0;
     while (i < maxlen - 1)
     {
-        int ch = getc();
+        int ch = getchar();
 
         if (ch == '\r' || ch == '\n')
         {
@@ -383,37 +869,39 @@ static void save_selections(void)
 }
 
 /*******************************
- * @brief  : 应用已选中的设备树覆盖（dtbo）文件
+ * @brief  : 应用已选中的 U-Boot 设备树覆盖（dtbo）文件
  * @param  : 无
- * @return : 无
+ * @return : 成功应用到 U-Boot control FDT 的插件数量
  *******************************/
-void omenu_fdt_apply(void)
+int omenu_uboot_fdt_apply(void)
 {
+    int applied_count = 0;
+    char dev_part[10];
+
     get_omenu_config(&cfg);
     update_selections();
 
-    char dev_part[10];
     snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.stroage_dev_num, cfg.stroage_partition);
 
     for (int i = 0; i < selection_count; i++)
     {
         const char *dtbo_path = selections[i];
-
-        OMENU_LOG(OMENU_LOG_INFO, "Applying overlay: %s\n", dtbo_path);
-
         loff_t len;
-        void *dtbo_buf = memalign(4, OMENU_MAX_DTBO_SIZE); // 分配 128KB 缓冲区
+        void *dtbo_buf;
+        int ret;
+
+        dtbo_buf = memalign(4, OMENU_MAX_DTBO_SIZE);
         if (!dtbo_buf)
         {
             OMENU_LOG(OMENU_LOG_ERROR, "Failed to allocate memory for overlay\n");
-            return;
+            return -ENOMEM;
         }
 
         if (fs_set_blk_dev(cfg.stroage_type, dev_part, OMENU_FS_TYPE))
         {
             OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
             free(dtbo_buf);
-            return;
+            return -ENODEV;
         }
 
         if (fs_read(dtbo_path, (ulong)dtbo_buf, 0, OMENU_MAX_DTBO_SIZE, &len))
@@ -430,20 +918,103 @@ void omenu_fdt_apply(void)
             continue;
         }
 
-        run_command("fdt resize 8192", 0);
+        ret = omenu_apply_uboot_overlay(dtbo_path, dtbo_buf);
+        if (ret > 0)
+            applied_count++;
 
-        int ret = fdt_overlay_apply_verbose(working_fdt, dtbo_buf);
+        free(dtbo_buf);
+    }
+
+    return applied_count;
+}
+
+/*******************************
+ * @brief  : 应用已选中的设备树覆盖（dtbo）文件
+ * @param  : 无
+ * @return : 无
+ *******************************/
+int omenu_fdt_apply(void)
+{
+    int applied_count = 0;
+
+    get_omenu_config(&cfg);
+    update_selections();
+
+    if (!working_fdt)
+    {
+        OMENU_LOG(OMENU_LOG_ERROR, "Kernel working fdt is NULL, skip overlays\n");
+        return -EINVAL;
+    }
+
+    char dev_part[10];
+    snprintf(dev_part, sizeof(dev_part), "%s:%s", cfg.stroage_dev_num, cfg.stroage_partition);
+
+    for (int i = 0; i < selection_count; i++)
+    {
+        const char *dtbo_path = selections[i];
+
+        OMENU_LOG(OMENU_LOG_INFO, "Applying overlay: %s\n", dtbo_path);
+
+        loff_t len;
+        void *dtbo_buf = memalign(4, OMENU_MAX_DTBO_SIZE); // 分配 128KB 缓冲区
+        if (!dtbo_buf)
+        {
+            OMENU_LOG(OMENU_LOG_ERROR, "Failed to allocate memory for overlay\n");
+            return -ENOMEM;
+        }
+
+        if (fs_set_blk_dev(cfg.stroage_type, dev_part, OMENU_FS_TYPE))
+        {
+            OMENU_LOG(OMENU_LOG_ERROR, "Failed to set blk dev\n");
+            free(dtbo_buf);
+            return -ENODEV;
+        }
+
+        if (fs_read(dtbo_path, (ulong)dtbo_buf, 0, OMENU_MAX_DTBO_SIZE, &len))
+        {
+            OMENU_LOG(OMENU_LOG_ERROR, "Failed to read dtbo file: %s\n", dtbo_path);
+            free(dtbo_buf);
+            continue;
+        }
+
+        if (fdt_check_header(dtbo_buf) != 0)
+        {
+            OMENU_LOG(OMENU_LOG_ERROR, "Invalid FDT overlay file: %s\n", dtbo_path);
+            free(dtbo_buf);
+            continue;
+        }
+
+        int ret = omenu_filter_kernel_overlay(dtbo_buf);
+        if (ret)
+        {
+            OMENU_LOG(OMENU_LOG_ERROR, "Failed to filter kernel overlay for %s: %s\n",
+                      dtbo_path, fdt_strerror(ret));
+            free(dtbo_buf);
+            continue;
+        }
+
+        if (omenu_prepare_fdt(working_fdt, "kernel"))
+        {
+            free(dtbo_buf);
+            continue;
+        }
+
+        ret = fdt_overlay_apply_verbose(working_fdt, dtbo_buf);
         if (ret < 0)
         {
-            OMENU_LOG(OMENU_LOG_INFO, "Overlay apply failed for %s\n", dtbo_path);
+            OMENU_LOG(OMENU_LOG_ERROR, "Kernel overlay apply failed for %s: %s\n",
+                      dtbo_path, fdt_strerror(ret));
         }
         else
         {
-            OMENU_LOG(OMENU_LOG_INFO, "Overlay applied: %s\n", dtbo_path);
+            OMENU_LOG(OMENU_LOG_INFO, "Kernel overlay applied: %s\n", dtbo_path);
+            applied_count++;
         }
 
         free(dtbo_buf);
     }
+
+    return applied_count;
 }
 
 /*******************************
@@ -517,7 +1088,7 @@ static void show_menu(const char *base_path)
 
             if (inbuf[0] == 'r') // 重启系统
             {
-                run_command("reboot", 0);
+                run_command("reset", 0);
                 continue;
             }
         }
@@ -562,7 +1133,7 @@ static void show_menu(const char *base_path)
  * @param  : cmdtp, flag, argc, argv - 命令行参数
  * @return : 0
  *******************************/
-static int do_omenu(struct cmd_tbl_s *cmdtp, int flag, int argc, char *const argv[])
+static int do_omenu(struct cmd_tbl *cmdtp, int flag, int argc, char *const argv[])
 {
     // 获取配置
     get_omenu_config(&cfg);

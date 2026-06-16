@@ -23,10 +23,17 @@
 #define OMENU_MAX_SELECTION 128     // 已选择的设备树插件数量的最大限值
 #define OMENU_MAX_PATH 256          // 菜单路径的最大长度
 #define OMENU_MAX_DTBO_SIZE 0x20000 // 设备树插件文本大小的最大限值
+#define OMENU_FDT_PAD_SIZE 0x2000   // 预留给 overlay merge 的额外空间
 
 #define OMENU_DIR_FILE_NAME "list.txt"          // 菜单目录列表文件名
-#define OMENU_SELECTED_FILE_NAME "selected.txt" // 已选择的设备树插件将保存在此文件中
-#define OMENU_FS_TYPE FS_TYPE_FAT               // 文件系统类型，目前支持FAT
+#define OMENU_SELECTED_FILE_NAME "/omenu/selected.txt" // 已选择的设备树插件将保存在此文件中
+#define OMENU_FS_TYPE FS_TYPE_EXT               // 文件系统类型，目前支持FAT
+
+#define OMENU_TARGET_PROP "target"
+#define OMENU_TARGET_PATH_PROP "target-path"
+#define OMENU_TARGET_UBOOT_PROP "target-uboot"
+#define OMENU_OVERLAY_NODE_NAME "__overlay__"
+#define OMENU_FIXUPS_NODE_PATH "/__fixups__"
 
 #ifdef CONFIG_OMENU_STORAGE_MMC
 #define OMENU_STORAGE_DEV "mmc"
@@ -46,5 +53,8 @@ typedef struct configs
     char stroage_partition[MAX_CFG_LEN];
     char directory_name[MAX_CFG_LEN];
 } configs_t;
+
+int omenu_fdt_apply(void);
+int omenu_uboot_fdt_apply(void);
 
 #endif
